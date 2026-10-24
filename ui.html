@@ -1,0 +1,31 @@
+<script>
+const STRENGTH = 1.0; // 0 = no change, 1 = full despill
+const BIAS = 1.0;     // lower (e.g. 0.95) if the face is still green
+
+onmessage = async (e) => {
+  const { id, bytes } = e.data.pluginMessage;
+  const bmp = await createImageBitmap(new Blob([bytes]));
+  const c = document.createElement('canvas');
+  c.width = bmp.width;
+  c.height = bmp.height;
+  const ctx = c.getContext('2d');
+  ctx.drawImage(bmp, 0, 0);
+
+  const img = ctx.getImageData(0, 0, c.width, c.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    const cap = ((d[i] + d[i + 2]) / 2) * BIAS;
+    if (d[i + 1] > cap) {
+      d[i + 1] = d[i + 1] * (1 - STRENGTH) + cap * STRENGTH;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const blob = await new Promise((r) => c.toBlob(r, 'image/png'));
+  const out = new Uint8Array(await blob.arrayBuffer());
+  parent.postMessage({ pluginMessage: { id, bytes: out } }, '*');
+};
+
+parent.postMessage({ pluginMessage: { ready: true } }, '*');
+</script>
